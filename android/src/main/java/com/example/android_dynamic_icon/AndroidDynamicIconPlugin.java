@@ -7,42 +7,22 @@ import androidx.lifecycle.LifecycleOwner;
 import android.app.Activity;
 import android.content.Context;
 
-
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
-import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
-import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
-import io.flutter.plugin.common.MethodChannel.Result;
-import android.app.Activity;
-import android.app.Application;
-import android.os.Bundle;
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.annotation.VisibleForTesting;
-import androidx.lifecycle.DefaultLifecycleObserver;
-import androidx.lifecycle.Lifecycle;
-import androidx.lifecycle.LifecycleOwner;
-import io.flutter.embedding.engine.plugins.FlutterPlugin;
 import io.flutter.embedding.engine.plugins.activity.ActivityAware;
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding;
 import io.flutter.embedding.engine.plugins.lifecycle.FlutterLifecycleAdapter;
 import io.flutter.plugin.common.BinaryMessenger;
-import io.flutter.plugin.common.PluginRegistry;
-import java.util.List;
-
-
+import android.app.Application;
+import android.os.Bundle;
+import androidx.annotation.VisibleForTesting;
 import io.flutter.Log;
 
 /** AndroidDynamicIconPlugin */
 public class AndroidDynamicIconPlugin implements FlutterPlugin, ActivityAware {
-  /// The MethodChannel that will the communication between Flutter and native Android
-  ///
-  /// This local reference serves to register the plugin with the Flutter Engine and unregister it
-  /// when the Flutter Engine is detached from the Activity
   private MethodChannel channel;
   private MethodCallImplementation handler;
   private static final String TAG = "[android_dynamic_icon]";
-
   private static final String CHANNEL_ID = "AndroidDynamicIcon";
 
   public static String getTAG() {
@@ -52,13 +32,6 @@ public class AndroidDynamicIconPlugin implements FlutterPlugin, ActivityAware {
   public static String getChannelId() {
     return CHANNEL_ID;
   }
-
-  @SuppressWarnings("deprecation")
-  public static void registerWith(io.flutter.plugin.common.PluginRegistry.Registrar registrar) {
-    final AndroidDynamicIconPlugin plugin = new AndroidDynamicIconPlugin();
-    plugin.setupChannel(registrar.messenger(), registrar.context(), registrar.activity());
-  }
-
 
   private void setupChannel(BinaryMessenger messenger, Context context, Activity activity) {
     channel = new MethodChannel(messenger, CHANNEL_ID);
@@ -72,10 +45,7 @@ public class AndroidDynamicIconPlugin implements FlutterPlugin, ActivityAware {
     handler = null;
   }
 
-
-
-   private class LifeCycleObserver
-      implements Application.ActivityLifecycleCallbacks, DefaultLifecycleObserver {
+  private class LifeCycleObserver implements Application.ActivityLifecycleCallbacks, DefaultLifecycleObserver {
     private final Activity thisActivity;
 
     LifeCycleObserver(Activity activity) {
@@ -95,16 +65,13 @@ public class AndroidDynamicIconPlugin implements FlutterPlugin, ActivityAware {
     public void onPause(@NonNull LifecycleOwner owner) {
       Log.i("ChangeIcon", "The app has paused");
       handler.updateIcon();
-    
     }
 
     @Override
-    public void onStop(@NonNull LifecycleOwner owner) {
-    }
+    public void onStop(@NonNull LifecycleOwner owner) {}
 
     @Override
-    public void onDestroy(@NonNull LifecycleOwner owner) {
-    }
+    public void onDestroy(@NonNull LifecycleOwner owner) {}
 
     @Override
     public void onActivityCreated(Activity activity, Bundle savedInstanceState) {}
@@ -124,73 +91,44 @@ public class AndroidDynamicIconPlugin implements FlutterPlugin, ActivityAware {
     @Override
     public void onActivityDestroyed(Activity activity) {
       if (thisActivity == activity && activity.getApplicationContext() != null) {
-        ((Application) activity.getApplicationContext())
-            .unregisterActivityLifecycleCallbacks(
-                this); // Use getApplicationContext() to avoid casting failures
+        ((Application) activity.getApplicationContext()).unregisterActivityLifecycleCallbacks(this);
       }
     }
 
     @Override
     public void onActivityStopped(Activity activity) {
-      if (thisActivity == activity) {
-        
-      }
+      if (thisActivity == activity) {}
     }
   }
 
-
-  /**
-   * Move all activity-lifetime-bound states into this helper object, so that {@code setup} and
-   * {@code tearDown} would just become constructor and finalize calls of the helper object.
-   */
   private class ActivityState {
     private Application application;
     private Activity activity;
     private LifeCycleObserver observer;
     private ActivityPluginBinding activityBinding;
-    private BinaryMessenger messenger;
-
-    // This is null when not using v2 embedding;
     private Lifecycle lifecycle;
 
-    // Default constructor
-    ActivityState(
-        final Application application,
-        final Activity activity,
-        final BinaryMessenger messenger,
-        final PluginRegistry.Registrar registrar,
-        final ActivityPluginBinding activityBinding) {
+    ActivityState(final Application application, final Activity activity, final BinaryMessenger messenger, final ActivityPluginBinding activityBinding) {
       this.application = application;
       this.activity = activity;
       this.activityBinding = activityBinding;
-      this.messenger = messenger;
-
       observer = new LifeCycleObserver(activity);
-      if (registrar != null) {
-        // V1 embedding setup for activity listeners.
-        application.registerActivityLifecycleCallbacks(observer);
-      } else {
-        // V2 embedding setup for activity listeners.
-        lifecycle = FlutterLifecycleAdapter.getActivityLifecycle(activityBinding);
-        lifecycle.addObserver(observer);
-      }
+      lifecycle = FlutterLifecycleAdapter.getActivityLifecycle(activityBinding);
+      lifecycle.addObserver(observer);
     }
 
     void release() {
       if (activityBinding != null) {
         activityBinding = null;
       }
-
       if (lifecycle != null) {
         lifecycle.removeObserver(observer);
         lifecycle = null;
       }
-
       if (application != null) {
         application.unregisterActivityLifecycleCallbacks(observer);
         application = null;
       }
-
       activity = null;
       observer = null;
     }
@@ -198,47 +136,30 @@ public class AndroidDynamicIconPlugin implements FlutterPlugin, ActivityAware {
     Activity getActivity() {
       return activity;
     }
-
   }
 
   private FlutterPluginBinding pluginBinding;
-  ActivityState activityState;
-
+  private ActivityState activityState;
 
   @Override
   public void onAttachedToEngine(@NonNull FlutterPluginBinding flutterPluginBinding) {
-    // channel = new MethodChannel(flutterPluginBinding.getBinaryMessenger(), "Changeicon");
-    // channel.setMethodCallHandler(this);
     setupChannel(flutterPluginBinding.getBinaryMessenger(), flutterPluginBinding.getApplicationContext(), null);
-    pluginBinding =  flutterPluginBinding;
+    pluginBinding = flutterPluginBinding;
   }
-
 
   @Override
   public void onAttachedToActivity(@NonNull ActivityPluginBinding binding) {
-    setup(
-        pluginBinding.getBinaryMessenger(),
-        (Application) pluginBinding.getApplicationContext(),
-        binding.getActivity(),
-        null,
-        binding);
-      handler.setActivity(binding.getActivity());
+    setup(pluginBinding.getBinaryMessenger(), (Application) pluginBinding.getApplicationContext(), binding.getActivity(), binding);
+    handler.setActivity(binding.getActivity());
   }
-
 
   @VisibleForTesting
   final ActivityState getActivityState() {
     return activityState;
   }
 
-  private void setup(
-      final BinaryMessenger messenger,
-      final Application application,
-      final Activity activity,
-      final PluginRegistry.Registrar registrar,
-      final ActivityPluginBinding activityBinding) {
-    activityState =
-        new ActivityState(application, activity, messenger,registrar, activityBinding);
+  private void setup(final BinaryMessenger messenger, final Application application, final Activity activity, final ActivityPluginBinding activityBinding) {
+    activityState = new ActivityState(application, activity, messenger, activityBinding);
   }
 
   private void tearDown() {
@@ -247,7 +168,6 @@ public class AndroidDynamicIconPlugin implements FlutterPlugin, ActivityAware {
       activityState = null;
     }
   }
-
 
   @Override
   public void onDetachedFromActivity() {
@@ -265,9 +185,8 @@ public class AndroidDynamicIconPlugin implements FlutterPlugin, ActivityAware {
     onAttachedToActivity(binding);
   }
 
-
   @Override
   public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
-   teardownChannel();
+    teardownChannel();
   }
 }
